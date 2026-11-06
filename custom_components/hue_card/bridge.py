@@ -171,6 +171,49 @@ class HueBridgeClient:
                 raise ValueError(f"Bridge error {resp.status}: {errors}")
             return data
 
+    async def async_scene_update(self, scene_id: str, changes: dict[str, Any]) -> Any:
+        """Change a scene with high-level parameters."""
+        scene = self.resources.get(scene_id)
+        if not scene or scene.get("type") != "scene":
+            raise ValueError("Szene nicht gefunden")
+        body: dict[str, Any] = {}
+        if "speed" in changes:
+            body["speed"] = max(0.0, min(1.0, float(changes["speed"])))
+        if "auto_dynamic" in changes:
+            body["auto_dynamic"] = bool(changes["auto_dynamic"])
+        if "mapping" in changes:
+            body["mapping"] = {"algorithm": changes["mapping"]}
+        actions = [dict(a) for a in scene.get("actions", [])]
+        touched = False
+        if "lights" in changes:
+            wanted = list(dict.fromkeys(changes["lights"]))
+            existing = {a["target"]["rid"]: a for a in actions}
+            template = _action_template(scene)
+            actions = [existing[rid] if rid in existing else {
+                "target": {"rid": rid, "rtype": "light"}, "action": template
+            } for rid in wanted]
+            touched = True
+        if "brightness" in changes:
+            bri = max(1.0, min(100.0, float(changes["brightness"])))
+            new_actions = []
+            for a in actions:
+                act = dict(a.get("action", {}))
+                if act.get("on", {}).get("on", True):
+                    act["dimming"] = {"brightness": bri}
+                new_actions.append({"target": a["target"], "action": act})
+            actions = new_actions
+            touched = True
+        if touched:
+            body["actions"] = [{"target": a["target"], "action": a["action"]} for a in actions]
+        if not body:
+            return None
+        result = await self.async_command("scene", scene_id, body)
+        if "brightness" in changes and (scene.get("status") or {}).get("active", "inactive") != "inactive":
+            recall = {"action": "dynamic_palette" if (scene.get("status") or {}).get("active") == "dynamic_palette" else "active",
+                      "dimming": {"brightness": max(1.0, min(100.0, float(changes["brightness"])))}}
+            await self.async_command("scene", scene_id, {"recall": recall})
+        return result
+
     # --------------------------------------------------------------- snapshot
     def snapshot(self) -> dict[str, Any]:
         """Return the data the card needs, already prepared."""
@@ -250,6 +293,17 @@ class HueBridgeClient:
                         temps.append(_mirek_to_hex(act["color_temperature"]["mirek"]))
             swatch = list(dict.fromkeys(colors + temps))[:5]
             image = (scene.get("metadata", {}).get("image") or {}).get("rid")
+            action_lights = [
+                act["target"]["rid"]
+                for act in scene.get("actions", [])
+                if (act.get("target") or {}).get("rtype") == "light"
+            ]
+            dims = [
+                act["action"]["dimming"]["brightness"]
+                for act in scene.get("actions", [])
+                if act.get("action", {}).get("on", {}).get("on", True)
+                and act.get("action", {}).get("dimming", {}).get("brightness") is not None
+            ]
             scenes.append(
                 {
                     "id": scene["id"],
@@ -264,9 +318,24 @@ class HueBridgeClient:
                     "active": (scene.get("status") or {}).get("active", "inactive"),
                     "last_recall": (scene.get("status") or {}).get("last_recall") or "",
                     "mapping": (scene.get("mapping") or {}).get("algorithm"),
+                    "lights": action_lights,
+                    "brightness": round(sum(dims) / len(dims)) if dims else None,
+                    "parent": None,
                 }
             )
+        scene_by_id = {sc["id"]: sc for sc in scenes}
         for smart in by_type.get("smart_scene", []):
+            children = []
+            for week in smart.get("week_timeslots", []) or []:
+                for slot in week.get("timeslots", []) or []:
+                    rid = (slot.get("target") or {}).get("rid")
+                    t = ((slot.get("start_time") or {}).get("time") or {})
+                    if rid and rid not in [c["id"] for c in children]:
+                        children.append({"id": rid, "time": "{:02d}:{:02d}".format(t.get("hour", 0), t.get("minute", 0))})
+            for child in children:
+                if child["id"] in scene_by_id:
+                    scene_by_id[child["id"]]["parent"] = smart["id"]
+            child_colors = [scene_by_id[c["id"]]["colors"][0] for c in children if c["id"] in scene_by_id]
             image = (smart.get("metadata", {}).get("image") or {}).get("rid")
             scenes.append(
                 {
@@ -274,7 +343,11 @@ class HueBridgeClient:
                     "kind": "smart_scene",
                     "name": smart.get("metadata", {}).get("name", ""),
                     "group": (smart.get("group") or {}).get("rid"),
-                    "colors": ["#FFE2A8", "#DDEBFF", "#FFF4DA"],
+                    "colors": child_colors[:6] or ["#FFE2A8", "#DDEBFF", "#FFF4DA"],
+                    "children": children,
+                    "lights": [],
+                    "brightness": None,
+                    "parent": None,
                     "image": image,
                     "dynamic": False,
                     "auto_dynamic": False,
@@ -290,7 +363,8 @@ class HueBridgeClient:
         # that the bridge still reports as active. Smart scenes win if active.
         for area in areas:
             candidates = [
-                sc for sc in scenes if sc["group"] == area["id"] and sc["active"] != "inactive"
+                sc for sc in scenes
+                if sc["group"] == area["id"] and sc["active"] != "inactive"
             ]
             smart = [sc for sc in candidates if sc["kind"] == "smart_scene"]
             if smart:
@@ -309,6 +383,22 @@ class HueBridgeClient:
 
 
 # ------------------------------------------------------------------- helpers
+def _action_template(scene: dict[str, Any]) -> dict[str, Any]:
+    """Light action for a lamp newly added to a scene."""
+    palette = scene.get("palette") or {}
+    for entry in palette.get("color", []) or []:
+        if entry.get("color", {}).get("xy"):
+            return {"on": {"on": True}, "dimming": {"brightness": (entry.get("dimming") or {}).get("brightness") or 60}, "color": {"xy": entry["color"]["xy"]}}
+    for entry in palette.get("color_temperature", []) or []:
+        mirek = entry.get("color_temperature", {}).get("mirek")
+        if mirek:
+            return {"on": {"on": True}, "dimming": {"brightness": (entry.get("dimming") or {}).get("brightness") or 60}, "color_temperature": {"mirek": mirek}}
+    for act in scene.get("actions", []):
+        if act.get("action"):
+            return dict(act["action"])
+    return {"on": {"on": True}}
+
+
 def _deep_merge(target: dict[str, Any], update: dict[str, Any]) -> None:
     for key, value in update.items():
         if isinstance(value, dict) and isinstance(target.get(key), dict):
@@ -351,6 +441,12 @@ def _light_info(light: dict[str, Any], device: dict[str, Any] | None) -> dict[st
         or (light.get("effects") or {}).get("effect_values")
         or [],
         "dynamics": (light.get("dynamics") or {}).get("status"),
+        "xy": xy,
+        "mirek": mirek,
+        "mirek_min": ((light.get("color_temperature") or {}).get("mirek_schema") or {}).get("mirek_minimum", 153),
+        "mirek_max": ((light.get("color_temperature") or {}).get("mirek_schema") or {}).get("mirek_maximum", 500),
+        "effects_v2": "effects_v2" in light,
+        "reachable": True,
     }
 
 

@@ -25,6 +25,7 @@ def async_register_websocket(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_get_home)
     websocket_api.async_register_command(hass, ws_subscribe)
     websocket_api.async_register_command(hass, ws_command)
+    websocket_api.async_register_command(hass, ws_scene_update)
 
 
 @websocket_api.websocket_command({vol.Required("type"): "hue_card/get_home"})
@@ -70,6 +71,32 @@ async def ws_command(hass: HomeAssistant, connection: websocket_api.ActiveConnec
         return
     try:
         result = await client.async_command(msg["rtype"], msg["rid"], msg["body"])
+    except Exception as err:  # noqa: BLE001
+        connection.send_error(msg["id"], "bridge_error", str(err))
+        return
+    connection.send_result(msg["id"], result)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "hue_card/scene_update",
+        vol.Required("scene_id"): str,
+        vol.Optional("brightness"): vol.Coerce(float),
+        vol.Optional("speed"): vol.Coerce(float),
+        vol.Optional("auto_dynamic"): bool,
+        vol.Optional("mapping"): str,
+        vol.Optional("lights"): [str],
+    }
+)
+@websocket_api.async_response
+async def ws_scene_update(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]) -> None:
+    client = _client(hass)
+    if client is None:
+        connection.send_error(msg["id"], "not_set_up", "Hue Card ist nicht eingerichtet")
+        return
+    changes = {k: msg[k] for k in ("brightness", "speed", "auto_dynamic", "mapping", "lights") if k in msg}
+    try:
+        result = await client.async_scene_update(msg["scene_id"], changes)
     except Exception as err:  # noqa: BLE001
         connection.send_error(msg["id"], "bridge_error", str(err))
         return
