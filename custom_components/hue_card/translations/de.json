@@ -1,0 +1,30 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Hue Card einrichten",
+        "description": "Wähle die Hue Bridge. Die Zugangsdaten werden von der vorhandenen Hue-Integration übernommen.",
+        "data": {
+          "bridge": "Bridge"
+        }
+      },
+      "manual": {
+        "title": "Bridge manuell koppeln",
+        "data": {
+          "host": "IP-Adresse der Bridge"
+        }
+      },
+      "link": {
+        "title": "Link-Knopf drücken",
+        "description": "Drücke den runden Knopf auf der Hue Bridge und klicke dann innerhalb von 30 Sekunden auf „Absenden“."
+      }
+    },
+    "error": {
+      "cannot_connect": "Bridge nicht erreichbar.",
+      "link_button": "Der Link-Knopf wurde nicht gedrückt. Bitte erneut versuchen."
+    },
+    "abort": {
+      "already_configured": "Diese Bridge ist bereits eingerichtet."
+    }
+  }
+}

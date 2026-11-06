@@ -1,0 +1,30 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Hue Card",
+        "description": "Choose the Hue bridge. Credentials are taken from the existing Hue integration.",
+        "data": {
+          "bridge": "Bridge"
+        }
+      },
+      "manual": {
+        "title": "Pair bridge manually",
+        "data": {
+          "host": "Bridge IP address"
+        }
+      },
+      "link": {
+        "title": "Press the link button",
+        "description": "Press the round button on the Hue bridge, then click Submit within 30 seconds."
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot reach the bridge.",
+      "link_button": "The link button was not pressed. Please try again."
+    },
+    "abort": {
+      "already_configured": "This bridge is already configured."
+    }
+  }
+}
