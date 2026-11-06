@@ -1,6 +1,6 @@
 /* Hue Card – Hue-App-artige Steuerung für Home Assistant */
 (() => {
-  const VERSION = "0.2.0";
+  const VERSION = "0.2.1";
 
   const ICONS = {
     bulb: "M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5V16h8v-2.5A6 6 0 0 0 12 3z",
@@ -393,7 +393,7 @@
       const badges = [];
       if (smart) badges.push("Tagesverlauf");
       else if (s.dynamic) badges.push("Dynamisch");
-      if (s.mapping === "spatial_aware" || s.mapping === "spatial") badges.push("Spatial Mapping");
+      if (s.mapping === "spatial") badges.push("Spatial Mapping");
       let content = "";
       if (smart) {
         const active = this._activeScene(area);
@@ -406,7 +406,7 @@
                 <span class="circle" style="width:44px;height:44px;background:${circleBg(cs.colors)}">${this._imageUrl(cs) ? `<img src="${this._imageUrl(cs)}" alt="" style="width:44px;height:44px" onerror="this.remove()">` : ""}</span>
                 <span style="display:flex;flex-direction:column;gap:2px;min-width:0">
                   <span class="lbl">${esc(cs.name)}</span>
-                  <span class="hint">ab ${esc(c.time)} Uhr${on ? " · aktiv" : ""}</span></span>
+                  <span class="hint">ab ${esc(c.time)}${on ? " · aktiv" : ""}</span></span>
               </button>
               <button class="round" data-action="scene-edit" data-id="${cs.id}" aria-label="${esc(cs.name)} bearbeiten" style="background:#33353C;color:#fff">${SVG.pen}</button>
             </div>`;
@@ -416,7 +416,7 @@
           <section style="display:flex;flex-direction:column;gap:8px"><h2 class="sec">Szenen in diesem Ablauf</h2>
             <div class="box" style="gap:0;padding:6px 14px">${rows || `<span class="hint">Keine Szenen gefunden.</span>`}</div></section>`;
       } else {
-        const spatialOk = !!s.mapping;
+        const spatialOk = scenes.some((x) => x.group === s.group && x.mapping === "spatial");
         const mapped = s.mapping && s.mapping !== "classic";
         const bri = s.brightness != null ? Math.round(s.brightness) : 100;
         const speed = Math.round((s.speed != null ? s.speed : 0.5) * 9) + 1;
@@ -681,7 +681,7 @@
         case "sheet-close":
           this._edit = null; this._editStack = []; this._render(); break;
         case "scene-map":
-          this._sceneUpdate(this._edit, { mapping: d.id === "spatial" ? (this._config.spatial_value || "spatial_aware") : "classic" }); break;
+          this._sceneUpdate(this._edit, { mapping: d.id === "spatial" ? "spatial" : "classic" }); break;
         case "scene-auto": {
           const s = this._scene(d.id);
           if (s) this._sceneUpdate(s.id, { auto_dynamic: !s.auto_dynamic });

@@ -329,9 +329,13 @@ class HueBridgeClient:
             for week in smart.get("week_timeslots", []) or []:
                 for slot in week.get("timeslots", []) or []:
                     rid = (slot.get("target") or {}).get("rid")
-                    t = ((slot.get("start_time") or {}).get("time") or {})
+                    st = slot.get("start_time") or {}
+                    t = st.get("time") or {}
+                    label = {"sunset": "Sonnenuntergang", "sunrise": "Sonnenaufgang"}.get(
+                        st.get("kind"), "{:02d}:{:02d} Uhr".format(t.get("hour", 0), t.get("minute", 0))
+                    )
                     if rid and rid not in [c["id"] for c in children]:
-                        children.append({"id": rid, "time": "{:02d}:{:02d}".format(t.get("hour", 0), t.get("minute", 0))})
+                        children.append({"id": rid, "time": label})
             for child in children:
                 if child["id"] in scene_by_id:
                     scene_by_id[child["id"]]["parent"] = smart["id"]
