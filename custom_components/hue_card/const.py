@@ -1,7 +1,7 @@
 """Constants for the Hue Card integration."""
 
 DOMAIN = "hue_card"
-VERSION = "0.2.1"  # keep in sync with manifest.json
+VERSION = "0.2.2"  # keep in sync with manifest.json
 
 CONF_HOST = "host"
 CONF_API_KEY = "api_key"

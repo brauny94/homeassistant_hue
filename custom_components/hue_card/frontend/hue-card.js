@@ -1,6 +1,6 @@
 /* Hue Card – Hue-App-artige Steuerung für Home Assistant */
 (() => {
-  const VERSION = "0.2.1";
+  const VERSION = "0.2.2";
 
   const ICONS = {
     bulb: "M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5V16h8v-2.5A6 6 0 0 0 12 3z",
@@ -210,7 +210,7 @@
     disconnectedCallback() { if (this._unsub) { this._unsub.then((u) => u && u()).catch(() => {}); this._unsub = null; } }
 
     getCardSize() { return 8; }
-    getGridOptions() { return { columns: 6, rows: 8, min_columns: 4, min_rows: 6 }; }
+    getGridOptions() { return { columns: 12, rows: "auto", min_columns: 6 }; }
     static getStubConfig() { return { area: "" }; }
 
     _subscribe() {
@@ -252,7 +252,9 @@
       }
       const editing = this._view === "lamp" || !!this._edit;
       const h = (this._config && this._config.height) || (editing ? 760 : null);
-      this.shadowRoot.innerHTML = `<style>${STYLE}</style><div class="card${h ? " fixed" : ""}" lang="de" style="${h ? `--hc-height:${Number(h)}px` : ""}">${body}</div>`;
+      const w = this._config && this._config.width;
+      const css = (h ? `--hc-height:${Number(h)}px;` : "") + (w ? `width:${Number(w)}px;max-width:100%;` : "");
+      this.shadowRoot.innerHTML = `<style>${STYLE}</style><div class="card${h ? " fixed" : ""}" lang="de" style="${css}">${body}</div>`;
       this.shadowRoot.querySelectorAll("[data-scroll]").forEach((el) => {
         const v = this._scroll[el.dataset.scroll];
         if (v) { if (el.classList.contains("hs")) el.scrollLeft = v; else el.scrollTop = v; }
