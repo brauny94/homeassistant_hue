@@ -1,6 +1,6 @@
 /* Hue Card – Hue-App-artige Steuerung für Home Assistant */
 (() => {
-  const VERSION = "0.2.2";
+  const VERSION = "0.3.0";
 
   const ICONS = {
     bulb: "M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5V16h8v-2.5A6 6 0 0 0 12 3z",
@@ -738,6 +738,59 @@
       }
     }
   }
+
+
+  // Spalten-Layout mit festen Breiten (z. B. Seitenleiste | Hue Card | Rest)
+  class HueLayout extends HTMLElement {
+    setConfig(config) {
+      if (!config || !Array.isArray(config.columns)) throw new Error("columns fehlt");
+      this._config = config;
+      this._built = false;
+      if (this._hass) this._build();
+    }
+    set hass(hass) {
+      this._hass = hass;
+      if (!this._built) this._build();
+      (this._cards || []).forEach((c) => { c.hass = hass; });
+    }
+    getCardSize() { return 12; }
+    async _build() {
+      this._built = true;
+      const helpers = await window.loadCardHelpers();
+      const gap = this._config.gap != null ? Number(this._config.gap) : 16;
+      const pad = this._config.padding != null ? Number(this._config.padding) : 16;
+      const root = this.shadowRoot || this.attachShadow({ mode: "open" });
+      root.innerHTML = `<style>:host{display:block}
+        .wrap{display:flex;gap:${gap}px;padding:${pad}px;align-items:flex-start;box-sizing:border-box}
+        .col{display:flex;flex-direction:column;gap:${gap}px;min-width:0}</style><div class="wrap"></div>`;
+      const wrap = root.querySelector(".wrap");
+      this._cards = [];
+      const make = (cfg, col, before) => {
+        const el = helpers.createCardElement(cfg);
+        el.hass = this._hass;
+        el.addEventListener("ll-rebuild", (ev) => {
+          ev.stopPropagation();
+          const idx = this._cards.indexOf(el);
+          const next = make(cfg, col, el);
+          el.remove();
+          if (idx >= 0) this._cards.splice(idx, 1);
+          return next;
+        }, { once: true });
+        if (before) col.insertBefore(el, before); else col.appendChild(el);
+        this._cards.push(el);
+        return el;
+      };
+      this._config.columns.forEach((c) => {
+        const col = document.createElement("div");
+        col.className = "col";
+        col.style.flex = c.width ? `0 0 ${Number(c.width)}px` : "1 1 0";
+        if (c.width) col.style.width = `${Number(c.width)}px`;
+        wrap.appendChild(col);
+        (c.cards || []).forEach((cfg) => make(cfg, col));
+      });
+    }
+  }
+  if (!customElements.get("hue-layout")) customElements.define("hue-layout", HueLayout);
 
   if (!customElements.get("hue-card")) {
     customElements.define("hue-card", HueCard);
