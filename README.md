@@ -1,5 +1,10 @@
 # Hue Card für Home Assistant
 
+> [!WARNING]
+> **Hinweis:** Der Code in diesem Repository wurde mit KI (Claude von Anthropic) erstellt und ist ein privates Projekt für den Eigengebrauch. Er wird nicht regelmäßig gewartet, es gibt keinen Support und keine Garantie, dass er mit künftigen Versionen von Home Assistant oder der Hue Bridge funktioniert. Nutzung auf eigenes Risiko.
+>
+> **Disclaimer:** The code in this repository was generated with AI (Claude by Anthropic) for personal use. It is not regularly maintained, comes without support or warranty, and may break with future Home Assistant or Hue Bridge versions. Use at your own risk.
+
 Eine Dashboard-Card, die Räume, Szenen und Lampen so steuert wie die Philips-Hue-App. Dahinter steckt eine kleine Integration, die direkt mit der Hue Bridge (API v2) spricht und Änderungen live über den Eventstream bekommt.
 
 **Stand: Stufe 1**
