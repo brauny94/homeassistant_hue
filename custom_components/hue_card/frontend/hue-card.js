@@ -1,6 +1,6 @@
 /* Hue Card – Hue-App-artige Steuerung für Home Assistant (Stufe 1) */
 (() => {
-  const VERSION = "0.1.0";
+  const VERSION = "0.1.2";
 
   const ICONS = {
     bulb: "M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5V16h8v-2.5A6 6 0 0 0 12 3z",
@@ -219,14 +219,22 @@
         <div class="areas">${group("room", "Räume")}${group("zone", "Zonen")}</div></div>`;
     }
 
+    _activeSceneId(area) {
+      const p = this._pending && this._pending[area.id];
+      if (p && Date.now() - p.t < 4000) return p.id;
+      return area.active_scene || null;
+    }
+
     _activeScene(area) {
-      return (this._data.scenes || []).find((s) => s.group === area.id && s.active && s.active !== "inactive") || null;
+      const id = this._activeSceneId(area);
+      return id ? (this._data.scenes || []).find((s) => s.id === id) || null : null;
     }
 
     _roomView(area) {
       const lights = this._data.lights || {};
       const scenes = (this._data.scenes || []).filter((s) => s.group === area.id);
       const active = this._activeScene(area);
+      const activeId = active ? active.id : null;
       const onCols = area.lights.map((id) => lights[id]).filter((l) => l && l.on).map((l) => l.color);
       const pal = active ? active.colors : onCols;
       const c1 = area.on && pal[0] ? pal[0] : null;
@@ -237,7 +245,7 @@
       const chip = light ? "rgba(255,255,255,.55)" : "rgba(22,23,27,.45)";
 
       const sceneTiles = scenes.map((s) => {
-        const sel = area.on && s.active && s.active !== "inactive";
+        const sel = area.on && s.id === activeId;
         const img = this._imageUrl(s);
         return `<div class="scene">
           <button data-action="scene" data-id="${s.id}" data-kind="${s.kind}" aria-pressed="${sel}" style="background:${sel ? `linear-gradient(160deg, ${s.colors[0]}CC, ${(s.colors[1] || s.colors[0])}99)` : "#26272D"}">
@@ -330,6 +338,8 @@
         case "scene": {
           const s = (data.scenes || []).find((x) => x.id === d.id);
           if (!s) break;
+          this._pending = this._pending || {};
+          if (s.group) { this._pending[s.group] = { id: s.id, t: Date.now() }; this._render(); }
           if (s.kind === "smart_scene") this._cmd("smart_scene", s.id, { recall: { action: "activate" } });
           else this._cmd("scene", s.id, { recall: { action: s.auto_dynamic ? "dynamic_palette" : "active" } });
           break;

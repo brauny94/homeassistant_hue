@@ -262,6 +262,7 @@ class HueBridgeClient:
                     "auto_dynamic": bool(scene.get("auto_dynamic")),
                     "speed": scene.get("speed"),
                     "active": (scene.get("status") or {}).get("active", "inactive"),
+                    "last_recall": (scene.get("status") or {}).get("last_recall") or "",
                     "mapping": (scene.get("mapping") or {}).get("algorithm"),
                 }
             )
@@ -279,10 +280,25 @@ class HueBridgeClient:
                     "auto_dynamic": False,
                     "speed": None,
                     "active": "active" if smart.get("state") == "active" else "inactive",
+                    "last_recall": "",
                     "mapping": None,
                 }
             )
         scenes.sort(key=lambda s: s["name"].lower())
+
+        # Exactly one active scene per area: the most recently recalled one
+        # that the bridge still reports as active. Smart scenes win if active.
+        for area in areas:
+            candidates = [
+                sc for sc in scenes if sc["group"] == area["id"] and sc["active"] != "inactive"
+            ]
+            smart = [sc for sc in candidates if sc["kind"] == "smart_scene"]
+            if smart:
+                area["active_scene"] = smart[0]["id"]
+            elif candidates:
+                area["active_scene"] = max(candidates, key=lambda sc: sc["last_recall"])["id"]
+            else:
+                area["active_scene"] = None
 
         return {
             "connected": self.connected,
