@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 
 from .bridge import HueBridgeClient
-from .const import CARD_FILENAME, CONF_API_KEY, CONF_HOST, DOMAIN, FRONTEND_URL_BASE
+from .const import CARD_FILENAME, CONF_API_KEY, CONF_HOST, FRONTEND_URL_BASE, VERSION
 from .websocket import async_register_websocket
 
 _LOGGER = logging.getLogger(__name__)
@@ -26,8 +26,7 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     await hass.http.async_register_static_paths(
         [StaticPathConfig(FRONTEND_URL_BASE, str(frontend_dir), False)]
     )
-    version = _version()
-    add_extra_js_url(hass, f"{FRONTEND_URL_BASE}/{CARD_FILENAME}?v={version}")
+    add_extra_js_url(hass, f"{FRONTEND_URL_BASE}/{CARD_FILENAME}?v={VERSION}")
     async_register_websocket(hass)
     return True
 
@@ -49,12 +48,3 @@ async def async_unload_entry(hass: HomeAssistant, entry: HueCardConfigEntry) -> 
     await entry.runtime_data.async_stop()
     return True
 
-
-def _version() -> str:
-    import json
-
-    manifest = Path(__file__).parent / "manifest.json"
-    try:
-        return json.loads(manifest.read_text(encoding="utf-8")).get("version", "0")
-    except (OSError, ValueError):
-        return "0"
